@@ -425,7 +425,7 @@ class PartnerInherit(models.Model):
 
     @api.onchange('gstn')
     def onchange_gstn(self):
-        if self.gstn:
+        if self.gstn and not self.is_customer_branch:
             self.vat = self.gstn[slice(2, 12, 1)]
             existing_customer = self.env['res.partner'].sudo().search([('is_company', '=', True), ('is_customer_branch','=', False), ('vat', '=', self.vat)])
             if existing_customer:
