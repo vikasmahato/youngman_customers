@@ -29,6 +29,9 @@ class Phone(models.Model):
 class GstVerification(models.Model):
     _name = 'gst.verification'
 
+    access_token = ""
+    client_id = ""
+
     @staticmethod
     def get_master_india_access_token():
         url = "https://pro.mastersindia.co/oauth/access_token"
@@ -47,21 +50,30 @@ class GstVerification(models.Model):
             'Content-Type': 'application/json',
         }
         response = requests.request("POST", url, headers=headers, data=payload)
-        return response.json()['access_token'], access_data["client_id"]
+        GstVerification.client_id = access_data["client_id"]
+        GstVerification.access_token = response.json()['access_token']
 
     @staticmethod
     def validate_gstn_from_master_india(gstin_num):
         url = "https://commonapi.mastersindia.co/commonapis/searchgstin?gstin=%s" % (gstin_num)
         _logger.info("Master india api url is %s" % (url))
-        acesstoken, clientid = GstVerification.get_master_india_access_token()
-        payload = ""
+
+        response = requests.request("GET", url, headers=GstVerification._get_master_india_header(), data="").json()
+
+        if response.get('error') == 'invalid_grant':
+            GstVerification.get_master_india_access_token()
+            response = requests.request("GET", url, headers=GstVerification._get_master_india_header(), data="").json()
+
+        return response
+
+    @staticmethod
+    def _get_master_india_header():
         headers = {
-            'client_id': clientid,
+            'client_id': GstVerification.client_id,
             'Content-type': 'application/json',
-            'Authorization': 'Bearer %s' % acesstoken
+            'Authorization': 'Bearer %s' % GstVerification.access_token
         }
-        response = requests.request("GET", url, headers=headers, data=payload)
-        return response.json()
+        return headers
 
 
 class BusinessType(models.Model):
@@ -102,8 +114,8 @@ class PartnerInherit(models.Model):
         gstn_data = super(PartnerInherit, self).validate_gstn_from_master_india(self.gstn)
         _logger.info(gstn_data)
         if (gstn_data['error']):
-            error_code = gstn_data["data"]["error"]["error_cd"]
-            error_msg = gstn_data["data"]["error"]["message"]
+            error_code = gstn_data["error"]
+            error_msg = gstn_data["message"]
             raise UserError("Failed to retrieve information from Masters India" + error_code + ": " + error_msg)
 
         if self.is_customer_branch:
