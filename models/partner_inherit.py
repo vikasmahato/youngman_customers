@@ -112,8 +112,8 @@ class PartnerInherit(models.Model):
             return
 
         gstn_data = super(PartnerInherit, self).validate_gstn_from_master_india(self.gstn)
-        _logger.info(gstn_data)
         if (gstn_data['error']):
+            _logger.error(gstn_data)
             error_code = gstn_data["error"]
             error_msg = gstn_data["message"]
             raise UserError("Failed to retrieve information from Masters India" + error_code + ": " + error_msg)
@@ -156,6 +156,8 @@ class PartnerInherit(models.Model):
         for addr in gstn_data["data"]["adadr"]:
             addresses.append(self._get_odoo_format_addr_from_master_india_addre(addr["addr"]))
 
+        _logger.info("evt=INVOICE_ADDRESS_SYNC res_partner_id=" + str(self.id) + " msg=Recieved total " + str(len(addresses)) + "addresses from master india")
+
         for address in addresses:
             existing_address = self.env['res.partner'].search(
                 [('is_company', '=', False),
@@ -169,9 +171,9 @@ class PartnerInherit(models.Model):
 
             if len(existing_address) == 0:
                 data = super(PartnerInherit, self).create([address])
-                _logger.info("Saved invoice address: " + str(data.id))
+                _logger.info("evt=INVOICE_ADDRESS_SYNC res_partner_id=" + str(self.id) + " msg=Saved invoice address with id" + str(data.id))
             else:
-                _logger.info("Invoice address already exists")
+                _logger.info("evt=INVOICE_ADDRESS_SYNC res_partner_id=" + str(self.id) + " msg=Invoice address already exists")
 
     def sync_customer_details_from_mastersindia(self):
         self.sync_customer_details_from_mastersindia_impl()
