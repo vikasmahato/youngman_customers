@@ -95,7 +95,7 @@ class PartnerInherit(models.Model):
     def _default_bd_tag(self):
         return self.env['res.partner.bd.tag'].browse(self._context.get('bd_tag_id'))
 
-    def sync_customer_details_from_mastersindia(self):
+    def sync_customer_details_from_mastersindia_impl(self):
         if self.is_non_gst_customer:
             return
 
@@ -107,7 +107,7 @@ class PartnerInherit(models.Model):
             raise UserError("Failed to retrieve information from Masters India" + error_code + ": " + error_msg)
 
         if self.is_customer_branch:
-            self._sync_invoice_addresses(self, gstn_data)
+            self._sync_invoice_addresses(gstn_data)
         elif self.is_customer_branch == False and self.is_company:
             self.vat = self.gstn[slice(2, 12, 1)]
             if self.gstn[5] == 'C' or self.gstn[5] == 'c':
@@ -162,7 +162,7 @@ class PartnerInherit(models.Model):
                 _logger.info("Invoice address already exists")
 
     def sync_customer_details_from_mastersindia(self):
-        self.sync_customer_details_from_mastersindia()
+        self.sync_customer_details_from_mastersindia_impl()
 
 
     in_beta = fields.Boolean(default=False, string="Exists In Beta", store=True)
