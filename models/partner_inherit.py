@@ -170,7 +170,7 @@ class PartnerInherit(models.Model):
                  ('zip', '=', address['zip'])], limit=1)
 
             if len(existing_address) == 0:
-                data = super(PartnerInherit, self).create([address])
+                data = self.env['res.partner'].create([address])
                 _logger.info("evt=INVOICE_ADDRESS_SYNC res_partner_id=" + str(self.id) + " msg=Saved invoice address with id" + str(data.id))
             else:
                 _logger.info("evt=INVOICE_ADDRESS_SYNC res_partner_id=" + str(self.id) + " msg=Invoice address already exists")
