@@ -15,5 +15,6 @@ class MyOpLeadsSync(models.TransientModel):
         for customer_branch in customer_branches:
             try:
                 customer_branch.sync_customer_details_from_mastersindia()
+                _logger.info("evt=INVOICE_ADDRESS_SYNC res_partner_id="+str(customer_branch.id)+" msg=Updated Invoice addresses.")
             except Exception as e:
-                _logger.error("evt='INVOICE_ADDRESS_SYNC' res_partner_id="+str(customer_branch.id)+" msg=%s", e)
+                _logger.error("evt=INVOICE_ADDRESS_SYNC res_partner_id="+str(customer_branch.id)+" msg=%s", e)

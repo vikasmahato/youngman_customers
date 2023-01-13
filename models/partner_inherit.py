@@ -100,7 +100,7 @@ class PartnerInherit(models.Model):
             return
 
         gstn_data = super(PartnerInherit, self).validate_gstn_from_master_india(self.gstn)
-        _logger.error(gstn_data)
+        _logger.info(gstn_data)
         if (gstn_data['error']):
             error_code = gstn_data["data"]["error"]["error_cd"]
             error_msg = gstn_data["data"]["error"]["message"]
