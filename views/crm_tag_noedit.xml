@@ -10,6 +10,9 @@
                       {'color_field': 'color', 'no_create_edit': True, 'no_create': True, 'create_edit':False, 'create':False}
                   </attribute>
               </field>
+            <xpath expr="//header//button[@name='action_set_won_rainbowman']" position="attributes">
+                <attribute name="invisible">"1"</attribute>
+            </xpath>
           </field>
       </record>
 
