@@ -29,6 +29,9 @@ class Phone(models.Model):
 class GstVerification(models.Model):
     _name = 'gst.verification'
 
+    access_token = ""
+    client_id = ""
+
     @staticmethod
     def get_master_india_access_token():
         url = "https://pro.mastersindia.co/oauth/access_token"
@@ -47,27 +50,37 @@ class GstVerification(models.Model):
             'Content-Type': 'application/json',
         }
         response = requests.request("POST", url, headers=headers, data=payload)
-        return response.json()['access_token'], access_data["client_id"]
+        GstVerification.client_id = access_data["client_id"]
+        GstVerification.access_token = response.json()['access_token']
 
     @staticmethod
     def validate_gstn_from_master_india(gstin_num):
         try:
             url = "https://commonapi.mastersindia.co/commonapis/searchgstin?gstin=%s" % (gstin_num)
             _logger.info("Master india api url is %s" % (url))
-            acesstoken, clientid = GstVerification.get_master_india_access_token()
-            payload = ""
-            headers = {
-                'client_id': clientid,
-                'Content-type': 'application/json',
-                'Authorization': 'Bearer %s' % acesstoken
-            }
-            response = requests.request("GET", url, headers=headers, data=payload)
-            response.raise_for_status()
-            return response.json()
+
+            response = requests.request("GET", url, headers=GstVerification._get_master_india_header(), data="").json()
+
+            if response.get('error') == 'invalid_grant':
+                GstVerification.get_master_india_access_token()
+                response = requests.request("GET", url, headers=GstVerification._get_master_india_header(), data="").json()
+                response.raise_for_status()
+
+            return response
         except requests.HTTPError as e:
             message = "Master India API request failed with code: {}, msg: {}, content: {}, url: {}".format(e.response.status_code, e.response.reason, e.response.content, url)
             _logger.error(message)
             raise UserError(message)
+
+
+    @staticmethod
+    def _get_master_india_header():
+        headers = {
+            'client_id': GstVerification.client_id,
+            'Content-type': 'application/json',
+            'Authorization': 'Bearer %s' % GstVerification.access_token
+        }
+        return headers
 
 
 class BusinessType(models.Model):
@@ -101,19 +114,19 @@ class PartnerInherit(models.Model):
     def _default_bd_tag(self):
         return self.env['res.partner.bd.tag'].browse(self._context.get('bd_tag_id'))
 
-    def sync_customer_details_from_mastersindia(self):
+    def sync_customer_details_from_mastersindia_impl(self):
         if self.is_non_gst_customer:
             return
 
         gstn_data = super(PartnerInherit, self).validate_gstn_from_master_india(self.gstn)
-        _logger.error(gstn_data)
         if (gstn_data['error']):
-            error_code = gstn_data["data"]["error"]["error_cd"]
-            error_msg = gstn_data["data"]["error"]["message"]
+            _logger.error(gstn_data)
+            error_code = gstn_data["error"]
+            error_msg = gstn_data["message"]
             raise UserError("Failed to retrieve information from Masters India" + error_code + ": " + error_msg)
 
         if self.is_customer_branch:
-            self._sync_invoice_addresses(self, gstn_data)
+            self._sync_invoice_addresses(gstn_data)
         elif self.is_customer_branch == False and self.is_company:
             self.vat = self.gstn[slice(2, 12, 1)]
             if self.gstn[5] == 'C' or self.gstn[5] == 'c':
@@ -150,6 +163,8 @@ class PartnerInherit(models.Model):
         for addr in gstn_data["data"]["adadr"]:
             addresses.append(self._get_odoo_format_addr_from_master_india_addre(addr["addr"]))
 
+        _logger.info("evt=INVOICE_ADDRESS_SYNC res_partner_id=" + str(self.id) + " msg=Recieved total " + str(len(addresses)) + "addresses from master india")
+
         for address in addresses:
             existing_address = self.env['res.partner'].search(
                 [('is_company', '=', False),
@@ -162,13 +177,13 @@ class PartnerInherit(models.Model):
                  ('zip', '=', address['zip'])], limit=1)
 
             if len(existing_address) == 0:
-                data = super(PartnerInherit, self).create([address])
-                _logger.info("Saved invoice address: " + str(data.id))
+                data = self.env['res.partner'].create([address])
+                _logger.info("evt=INVOICE_ADDRESS_SYNC res_partner_id=" + str(self.id) + " msg=Saved invoice address with id" + str(data.id))
             else:
-                _logger.info("Invoice address already exists")
+                _logger.info("evt=INVOICE_ADDRESS_SYNC res_partner_id=" + str(self.id) + " msg=Invoice address already exists")
 
     def sync_customer_details_from_mastersindia(self):
-        self.sync_customer_details_from_mastersindia()
+        self.sync_customer_details_from_mastersindia_impl()
 
 
     in_beta = fields.Boolean(default=False, string="Exists In Beta", store=True)
