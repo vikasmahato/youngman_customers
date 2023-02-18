@@ -5,7 +5,7 @@ import re
 import traceback
 import requests
 import json
-
+from odoo.exceptions import UserError
 from odoo.modules import get_module_resource
 
 import json
@@ -69,18 +69,24 @@ class Partner(models.Model):
 
     @staticmethod
     def validate_gstn_from_master_india(gstin_num):
-        url = "https://commonapi.mastersindia.co/commonapis/searchgstin?gstin=%s" % (gstin_num)
-        _logger.info("Master india api url is %s" % (url))
-        acesstoken, clientid = Partner.get_master_india_access_token()
-        payload = ""
-        headers = {
-            'client_id': clientid,
-            'Content-type': 'application/json',
-            'Authorization': 'Bearer %s' % acesstoken
-        }
+        try:
+            url = "https://commonapi.mastersindia.co/commonapis/searchgstin?gstin=%s" % (gstin_num)
+            _logger.info("Master india api url is %s" % (url))
+            acesstoken, clientid = Partner.get_master_india_access_token()
+            payload = ""
+            headers = {
+                'client_id': clientid,
+                'Content-type': 'application/json',
+                'Authorization': 'Bearer %s' % acesstoken
+            }
 
-        response = requests.request("GET", url, headers=headers, data=payload)
-        return response.json()
+            response = requests.request("GET", url, headers=headers, data=payload)
+            response.raise_for_status()
+            return response.json()
+        except requests.HTTPError as e:
+            message = "Master India API request failed with code: {}, msg: {}, content: {}, url: {}".format(e.response.status_code, e.response.reason, e.response.content, url)
+            _logger.error(message)
+            raise UserError(message)
 
     def _validate_gstn_length(self):
         if len(self.gstn) != 15:
